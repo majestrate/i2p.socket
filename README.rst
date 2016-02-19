@@ -13,21 +13,20 @@ requires:
 
 usage:
 
-```from i2p import socket 
+.. code::python
 
-# regular socket
-sock = socket.socket() 
-sock.connect(("geti2p.net", 80))
-sock.send(b"GET /\r\n\r\n")
-print (sock.recv(1024))
-sock.close()
+  from i2p import socket 
 
-# i2p socket
-sock = socket.socket(socket.AF_I2P)
-sock.connect(("i2p-projekt.i2p", 80))
-sock.send(b"GET /\r\n\r\n")
-print (sock.recv(1024))
-sock.close()
+  # regular socket
+  sock = socket.socket() 
+  sock.connect(("geti2p.net", 80))
+  sock.send(b"GET /\r\n\r\n")
+  print (sock.recv(1024))
+  sock.close()
 
-```
-
+  # i2p socket
+  sock = socket.socket(socket.AF_I2P)
+  sock.connect(("i2p-projekt.i2p", 80))
+  sock.send(b"GET /\r\n\r\n")
+  print (sock.recv(1024))
+  sock.close()
