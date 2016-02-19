@@ -9,7 +9,7 @@ from Crypto.Random.random import StrongRandom as random
 from enum import Enum
 
 from . import crypto
-from .i2cp import util
+from . import util
 
 
 #

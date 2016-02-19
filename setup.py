@@ -17,6 +17,8 @@ if os.path.exists(install_requires_fname):
     with open(install_requires_fname, 'r') as infile:
         install_requires = infile.read().split()
 
+if sys.version_info[0] < 3:
+    install_requires.append("future>=0.14.0")
 
 version = '0.0.1'
 

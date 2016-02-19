@@ -8,7 +8,7 @@ class TestSocket(TestCase):
         """
         test socket connections
         """
-        sock = socket.socket()
+        sock = socket.socket(socket.AF_I2P)
         sock.connect(("str4d.i2p", 80))
         sock.close()
 

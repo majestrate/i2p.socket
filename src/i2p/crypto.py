@@ -9,7 +9,7 @@ from pyelliptic.ecc import ECC
 from enum import Enum
 import libnacl
 
-from i2p.i2cp.util import *
+from .util import *
 
 #
 # Parameters

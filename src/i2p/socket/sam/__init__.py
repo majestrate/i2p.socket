@@ -24,16 +24,16 @@ AF_INET6 = pysocket.AF_INET6
 
 class i2p_socket:
 
-    def __init__(self, type=SOCK_STREAM, samaddr, dgramaddr, dgrambind):
+    def __init__(self, type, samaddr, dgramaddr, dgrambind):
         """
         create an i2p socket
         """
         if type == SOCK_STREAM:
-            type = SAM.SOCK_STREAM
+            type = simple.SAM.SOCK_STREAM
         elif type == SOCK_DGRAM:
-            type = SAM.SOCK_DGRAM
+            type = simple.SAM.SOCK_DGRAM
         elif type == SOCK_RAW:
-            type = SAM.SOCK_RAW
+            type = simple.SAM.SOCK_RAW
         else:
             raise ValueError("invalid socket type with AF_I2P")
         sock = simple.Socket(samaddr, dgramaddr, dgrambind, type)
@@ -53,7 +53,7 @@ def socket(family=AF_INET, type=SOCK_STREAM, proto=0, samaddr=('127.0.0.1', 7656
     if family is AF_I2P, the socket will use i2p otherwise it will call socket.socket
     """
     if family == AF_I2P:
-        return i2p_socket(type, fileno, samaddr, dgramaddr, dgrambind)
+        return i2p_socket(type, samaddr, dgramaddr, dgrambind)
     else:
         return pysocket.socket(family, type, proto)
         
