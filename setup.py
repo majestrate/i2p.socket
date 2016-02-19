@@ -44,5 +44,5 @@ setup(
     version=version,
     install_requires=install_requires,
     package_dir={'': 'src'},
-    packages=['i2p.socket', 'i2p.socket.sam', 'i2p'],
+    packages=['i2p', 'i2p.socket', 'i2p.socket.sam'],
 )

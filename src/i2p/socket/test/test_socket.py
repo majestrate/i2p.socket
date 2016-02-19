@@ -9,7 +9,7 @@ class TestSocket(TestCase):
         test socket connections
         """
         sock = socket.socket()
-        sock.connect(("psi.i2p", 80))
+        sock.connect(("str4d.i2p", 80))
         sock.close()
 
         
