@@ -13,7 +13,11 @@ requires:
 
 usage:
 
-::
+
+.. code-block:: python
+
+   ::
+   
     from i2p import socket 
 
     # regular socket
