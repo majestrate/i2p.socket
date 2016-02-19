@@ -13,7 +13,7 @@ requires:
 
 usage:
 
-``from i2p import socket 
+```from i2p import socket 
 
 # regular socket
 sock = socket.socket() 
@@ -29,5 +29,5 @@ sock.send(b"GET /\r\n\r\n")
 print (sock.recv(1024))
 sock.close()
 
-``
+```
 
