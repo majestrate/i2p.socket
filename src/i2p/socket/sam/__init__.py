@@ -22,6 +22,8 @@ AF_I2P = 9002
 AF_INET = pysocket.AF_INET
 AF_INET6 = pysocket.AF_INET6
 
+# TODO: socket options
+
 class i2p_socket:
 
     def __init__(self, type, samaddr, dgramaddr, dgrambind):
@@ -66,4 +68,3 @@ def getaddrinfo(host, *args, **kwargs):
     if host.endswith(".i2p"):
         return [(AF_SAM, SOCK_STREAM, 0, host, 0)]
     return pysocket.getaddrinfo(host, *args, **kwargs)
-

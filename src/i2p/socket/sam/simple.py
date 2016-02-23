@@ -160,10 +160,10 @@ class Socket(object):
                 try:
                     samSocket.connect(self._samAddr)
                     self._samHandshake(samSocket)
-                except pysocket.timeout:
-                    self._log.warn("timeout connecting to SAM")
+                except pysocket.timeout as ex:
+                    raise ex
                 except pysocket.error as ex:
-                    self._log.warn("error connecting to SAM: {}".format(ex))
+                    raise ex
                 else:
                     self._samSocket = samSocket
             return func(self, *args, **kwargs)
@@ -181,6 +181,7 @@ class Socket(object):
             self._data_sock = None
             self._state = State.Initial
             self._type = socketType
+            self.dest = None
         else:
             raise ValueError("samaddr must not be None")
 
@@ -195,6 +196,8 @@ class Socket(object):
         repl = _sam_cmd(sock, 'HELLO VERSION MIN=3.0 MAX=3.2')
         if repl.opts['RESULT'] == 'OK':
             self._state = State.Established
+        else:
+            raise Exception("failed to handshake with SAM: {}".format(repl.opts["RESULT"]))
         
         
     @samConnect
@@ -257,8 +260,13 @@ class Socket(object):
             style = "RAW"
             
         self._keys = 'TRANSIENT'
-        if keyfile and os.path.exists(keyfile):
-            with open(keyfile) as f:
+        if keyfile:
+            if isinstance(keyfile, str):
+                if os.path.exists(keyfile):
+                    with open(keyfile) as f:
+                        data = f.read()
+                        self._keys = data.strip()
+            elif hasattr(keyfile, 'read'):
                 data = f.read()
                 self._keys = data.strip()
         cmd = 'SESSION CREATE STYLE={} DESTINATION={} ID={}'.format(style, self._keys, nickname)
@@ -271,13 +279,18 @@ class Socket(object):
         if repl.opts['RESULT'] == 'OK':
             self._keys = repl.opts['DESTINATION']
             if keyfile:
-                with open(keyfile, 'w') as f:
-                    f.write(self._keys)
+                if isinstance(keyfile, str):
+                    with open(keyfile, 'w') as f:
+                        f.write(self._keys)
+                elif hasattr(keyfile, "write"):
+                    keyfile.write(self._keys)
             self.dest = datatypes.Destination(raw=self._keys, b64=True, private=True)
             self._nick = nickname
             self._state = State.Ready
         else:
             self._state = State.Error
+            # TODO: different types of errors for different types of results from sam
+            raise Error("bad result from sam: {}".format(repl.opts["RESULT"]))
 
     @samState(State.Ready)
     @samType(SAM.SOCK_STREAM)
@@ -293,6 +306,7 @@ class Socket(object):
             dest = _sam_readline(sock)
             return sock, dest
         else:
+            # TODO: raise exception?
             return None, None
             
     @samState(State.Running)
@@ -368,6 +382,10 @@ class Socket(object):
         shutdown sending/recving
         :param flag: 
         """
+        if self._type == SAM.SOCK_STREAM:
+            return self._data_sock.shutdown(flag)
+        elif self._type == SAM.SOCK_DGRAM:
+            return self._dgram_sock.shutdown(flag)
 
     @samState(State.Running, State.Established, State.Ready)
     def close(self):
@@ -385,6 +403,10 @@ class Socket(object):
         :param name: a name or b32 address
         :returns a b64 destination string:
         """
+        # check cache
+        if name in self._dest_cache:
+            return self._dest_cache[name]
+        # cache miss, do lookup
         repl = _sam_cmd(self._samSocket, "NAMING LOOKUP NAME={}".format(name))
         if 'VALUE' in repl.opts:
             dest = repl.opts['VALUE']
