@@ -263,12 +263,12 @@ class Socket(object):
         if keyfile:
             if isinstance(keyfile, str):
                 if os.path.exists(keyfile):
-                    with open(keyfile) as f:
-                        data = f.read()
-                        self._keys = data.strip()
+                    with open(keyfile, 'rb') as f:
+                        self.dest = datatypes.Destination(raw=f, private=True)
+                        self._keys = self.dest.base64()
             elif hasattr(keyfile, 'read'):
-                data = f.read()
-                self._keys = data.strip()
+                self.dest = datatypes.Destination(raw=keyfile, private=True)
+                self._keys = self.dest.base64()
         cmd = 'SESSION CREATE STYLE={} DESTINATION={} ID={}'.format(style, self._keys, nickname)
 
         for opt in i2cpOptions:
@@ -278,13 +278,15 @@ class Socket(object):
 
         if repl.opts['RESULT'] == 'OK':
             self._keys = repl.opts['DESTINATION']
-            if keyfile:
-                if isinstance(keyfile, str):
-                    with open(keyfile, 'w') as f:
-                        f.write(self._keys)
-                elif hasattr(keyfile, "write"):
-                    keyfile.write(self._keys)
-            self.dest = datatypes.Destination(raw=self._keys, b64=True, private=True)
+            if self.dest is None:
+                self.dest = datatypes.Destination(raw=self._keys, b64=True, private=True)
+                if keyfile:
+                    data = self.dest.serialize(priv=True)
+                    if isinstance(keyfile, str):
+                        with open(keyfile, 'wb') as f:
+                            f.write(data)
+                    elif hasattr(keyfile, "write"):
+                        keyfile.write(data)
             self._nick = nickname
             self._state = State.Ready
         else:
