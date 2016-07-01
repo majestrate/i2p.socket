@@ -49,7 +49,7 @@ class i2p_socket:
         self.fileno = sock.fileno
         self.getsocketinfo = sock.getsocketinfo
 
-def socket(family=AF_INET, type=SOCK_STREAM, proto=0, samaddr=('127.0.0.1', 7656), dgramaddr=('127.0.0.1', 7655), dgrambind=('127.0.0.1', 0)):
+def socket(family=AF_I2P, type=SOCK_STREAM, proto=0, samaddr=('127.0.0.1', 7656), dgramaddr=('127.0.0.1', 7655), dgrambind=('127.0.0.1', 0)):
     """
     wraps socket.socket
     if family is AF_I2P, the socket will use i2p otherwise it will call socket.socket
