@@ -20,7 +20,7 @@ if os.path.exists(install_requires_fname):
 if sys.version_info[0] < 3:
     install_requires.append("future>=0.14.0")
 
-version = '0.0.1'
+version = '0.1'
 
 setup(
     name='i2p.socket',
@@ -29,6 +29,7 @@ setup(
     author='Jeff',
     author_email='ampernand@gmail.com',
     url='https://github.com/majestrate/i2p.socket',
+    download_url='https://github.com/majestrate/i2p.socket/tarball/{}'.format(version),
     classifiers=[
         'Development Status :: 3 - Alpha',
         'Intended Audience :: Developers',
@@ -46,4 +47,5 @@ setup(
     version=version,
     install_requires=install_requires,
     packages=['i2p', 'i2p.socket', 'i2p.socket.sam'],
+    keywords=['i2p', 'socket'],
 )
