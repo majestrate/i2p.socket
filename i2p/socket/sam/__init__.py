@@ -47,6 +47,7 @@ class i2p_socket:
         self.sendto = sock.sendto
         self.recvfrom = sock.recvfrom
         self.fileno = sock.fileno
+        self.accept = sock.accept
         self.getsocketinfo = sock.getsocketinfo
 
 def socket(family=AF_I2P, type=SOCK_STREAM, proto=0, samaddr=('127.0.0.1', 7656), dgramaddr=('127.0.0.1', 7655), dgrambind=('127.0.0.1', 0)):
