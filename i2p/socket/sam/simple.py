@@ -95,6 +95,7 @@ def _sam_readline(sock):
 
 SamReply = collections.namedtuple('SamReply', ['cmd', 'opts'])
 
+
 def _sam_parse_reply(line):
     """
     parse a reply line into a dict
@@ -115,13 +116,26 @@ def _sam_cmd(sock, line):
     do a sam command on a socket
     :returns result:
     """
-    #print ('sam --> '+line)
-    sock.send(bytearray(line, 'ascii'))
-    sock.send(b'\n')
+    line = bytearray(line, 'ascii') + b'\n'
+    sock.send(line)
     _line = _sam_readline(sock)
-    #print ('sam <-- '+_line)
     return _sam_parse_reply(_line)
+
+class _WrappedPySocket(object):
+    """
+    a native python socket wrapped to expose i2p addreses instead of ip addresses
+    """
     
+    def __init__(self, pysock, localdest, remotedest):
+        self.send = pysock.send
+        self.recv = pysock.recv
+        self.fileno = pysock.fileno
+        self.close = pysock.close
+        self.shutdown = pysock.shutdown
+        self.getpeername = lambda : remotedest
+        self.getsocketname = lambda : localdest
+        
+
 class Socket(object):
     """
     base of all sam socket objects
@@ -158,7 +172,9 @@ class Socket(object):
                 samSocket = pysocket.socket()
                 samSocket.setsockopt(pysocket.IPPROTO_TCP, pysocket.SO_KEEPALIVE, 1)
                 try:
+                    # connect
                     samSocket.connect(self._samAddr)
+                    # do handshake
                     self._samHandshake(samSocket)
                 except pysocket.timeout as ex:
                     raise ex
@@ -171,7 +187,7 @@ class Socket(object):
     
     def __init__(self, samaddr, dgramAddr, dgramBind, socketType):
         """
-        :param samaddr: the socket address for sam
+        Internal use ONLY currently, do not use externally
         """
         if samaddr:
             self._samAddr = samaddr
@@ -182,6 +198,7 @@ class Socket(object):
             self._state = State.Initial
             self._type = socketType
             self.dest = None
+            self.socketname = None
         else:
             raise ValueError("samaddr must not be None")
 
@@ -193,60 +210,83 @@ class Socket(object):
         """
         handshake with sam via a socket.socket instance
         """
+        #TODO: sam versions
         repl = _sam_cmd(sock, 'HELLO VERSION MIN=3.0 MAX=3.2')
         if repl.opts['RESULT'] == 'OK':
             self._state = State.Established
         else:
+            self._state = State.Error
             raise Exception("failed to handshake with SAM: {}".format(repl.opts["RESULT"]))
         
         
     @samConnect
     @samState(State.Established)
     @samType(SAM.SOCK_STREAM)
-    def connect(self, addr, **i2cpOptions):
+    def connect(self, addr, socketname=None, **i2cpOptions):
         """
         connect to a remote endpoint
-        :param addr: the remote endpoint to connect to, either a destination/name or a (destination/name, port) tuple
-        :param keyfile: the file containing the private keys to use or None for transient
-        :param nickname: the nickname to use for tunnels or None for random decided by sam
+        :param addr: the remote endpoint to connect to, either a destinatio/name or a (destination/name, port) tuple
+        :param socketname: socketname of the destination to connect with, None to use a transient destination
         :param i2cpOptions: additional i2cp options to pass into sam
         """
         self._log.info('connect')
-        nickname = randnick(7)
-        self.bind(None, nickname, **i2cpOptions)
+        if socketname is None:
+            # bind ephemeral session
+            nickname = randnick(7)
+            self.bind(None, nickname, **i2cpOptions)
+        else:
+            # use existing session
+            nickname = socketname
+
+        # TODO: specfify i2p ports
+        
         if isinstance(addr, tuple):
             addr = addr[0]
         dest = self.lookup(addr)
-        # new socket
+        # connect out
         self._data_sock = pysocket.socket()
         self._data_sock.connect(self._samAddr)
-        # say hello
+        # handshake
+        # TODO: versions
         repl = _sam_cmd(self._data_sock, 'HELLO VERSION MIN=3.0 MAX=3.2')
-        # send connect
-        cmd = 'STREAM CONNECT ID={} DESTINATION={} SILENT=false'.format(nickname, dest)
         if repl.opts["RESULT"] == "OK":
+            # handshake good
+            cmd = 'STREAM CONNECT ID={} DESTINATION={} SILENT=false'.format(nickname, dest.base64())
             repl = _sam_cmd(self._data_sock, cmd)
-            self._state = State.Running
-        else:
-            self._state = State.Error
+            if repl.opts["RESULT"] == "OK":
+                self._state = State.Running
+                # connect okay
+                return
+        # TODO: raise correct exceptions for error messages
+        # either handshake fail or stream connect fail
+        raise Exception("cannot connect to {}: {}".format(dest, repl))
 
-    def getsocketinfo(self):
-        return self.dest
-            
+    def getsocketname(self):
+        if self.dest:
+            return self.dest.to_public()
+
+    def getpeername(self):
+        return self._peer
+
+    @samConnect
+    @samState(State.Established)
+    @samType(SAM.SOCK_STREAM)
+    def listen(self, n):
+        return
+    
     @samConnect
     @samState(State.Established)
     @samType(SAM.SOCK_STREAM, SAM.SOCK_DGRAM)
     def bind(self, keyfile, nickname=None, **i2cpOptions):
         """
         bind to an address
-        :param keyfile: the file containing the private keys to use
+        :param keyfile: the file containing the private keys to use or None to not store
         :param nickname: the nickname to use for tunnels or None for random decided by sam
         :param i2cpOptions: additional i2cp options to pass into sam
         """
         if nickname is None:
             nickname = randnick(8)
         self._state = State.Connecting
-        self._log.info('bind')
         if self._type == SAM.SOCK_STREAM:
             style = "STREAM"
         elif self._type == SAM.SOCK_DGRAM:
@@ -257,19 +297,20 @@ class Socket(object):
             i2cpOptions["HOST"] = self._dgram_bind[0]
             i2cpOptions["PORT"] = port
         else:
+            # TODO: implement
             style = "RAW"
             
-        self._keys = 'TRANSIENT'
+        _keys = 'TRANSIENT'
         if keyfile:
             if isinstance(keyfile, str):
                 if os.path.exists(keyfile):
                     with open(keyfile, 'rb') as f:
                         self.dest = datatypes.Destination(raw=f, private=True)
-                        self._keys = self.dest.base64()
+                        _keys = self.dest.base64()
             elif hasattr(keyfile, 'read'):
                 self.dest = datatypes.Destination(raw=keyfile, private=True)
-                self._keys = self.dest.base64()
-        cmd = 'SESSION CREATE STYLE={} DESTINATION={} ID={}'.format(style, self._keys, nickname)
+                _keys = self.dest.base64()
+        cmd = 'SESSION CREATE STYLE={} DESTINATION={} ID={}'.format(style, _keys, nickname)
 
         for opt in i2cpOptions:
             cmd += " {}={}".format(opt, i2cpOptions[opt])
@@ -277,9 +318,9 @@ class Socket(object):
         repl = _sam_cmd(self._samSocket, cmd)
 
         if repl.opts['RESULT'] == 'OK':
-            self._keys = repl.opts['DESTINATION']
+            _keys = repl.opts['DESTINATION']
             if self.dest is None:
-                self.dest = datatypes.Destination(raw=self._keys, b64=True, private=True)
+                self.dest = datatypes.Destination(raw=_keys, b64=True, private=True)
                 if keyfile:
                     data = self.dest.serialize(priv=True)
                     if isinstance(keyfile, str):
@@ -287,29 +328,38 @@ class Socket(object):
                             f.write(data)
                     elif hasattr(keyfile, "write"):
                         keyfile.write(data)
-            self._nick = nickname
+            self.socketname = nickname
             self._state = State.Ready
         else:
             self._state = State.Error
             # TODO: different types of errors for different types of results from sam
-            raise Error("bad result from sam: {}".format(repl.opts["RESULT"]))
+            raise Exception("bad result from sam: {}".format(repl.opts["RESULT"]))
 
     @samState(State.Ready)
     @samType(SAM.SOCK_STREAM)
     def accept(self):
-        cmd = 'STREAM ACCEPT ID={} SILENT=false'.format(self._nick)
+        # connect to sam
         sock = pysocket.socket()
         sock.connect(self._samAddr)
         # say hello
         repl = _sam_cmd(sock, 'HELLO VERSION MIN=3.0 MAX=3.2')
-        # send command
-        repl = _sam_cmd(sock, cmd)
-        if repl.opts['RESULT'] == 'OK':
-            dest = _sam_readline(sock)
-            return sock, dest
-        else:
-            # TODO: raise exception?
-            return None, None
+        if repl.opts["RESULT"] == "OK":
+            # send command
+            cmd = 'STREAM ACCEPT ID={} SILENT=false'.format(self.socketname)
+            repl = _sam_cmd(sock, cmd)
+            if repl.opts['RESULT'] == 'OK':
+                # read destination for inbound
+                dest = _sam_readline(sock)
+                # parse destination
+                dest = datatypes.Destination(raw=dest, b64=True)
+                # cache b32 address
+                self._dest_cache[dest.base32()] = dest
+                # override socket functions
+                sock = _WrappedPySocket(sock, self.dest, dest)
+                # return socket
+                return sock, dest
+        # TODO: raise appropriate errors
+        raise Exception("failed to accept: {}".format(repl))
             
     @samState(State.Running)
     @samType(SAM.SOCK_STREAM)
@@ -339,21 +389,22 @@ class Socket(object):
         :param buff: bytearray
         :return count:
         """
-        # first look up the name if we don't know it
-        if address[0] not in self._dest_cache:
-            self._dest_cache[address[0]] = None
-            self.lookup(address[0])
-
-        if address[0] in self._dest_cache:
-            remote_dest = self._dest_cache[address[0]]
-            if remote_dest:
-                dgram = bytearray()
-                dgram += b"3.0 "
-                dgram += self._nick.encode('ascii') + b" "
-                dgram += remote_dest.encode('ascii') + b"\n"
-                dgram += data
-                return self._dgram_sock.sendto(dgram, self._samDgramAddr)
-        
+        # TODO: SAM 3.3
+        port = 0
+        if isinstance(address, tuple):
+            address = address[0]
+            port = address[1]
+        remote_dest = self.loopkup(address)
+        if remote_dest:
+            dgram = bytearray()
+            dgram += b"3.0 "
+            dgram += self.socketname.encode('ascii') + b" "
+            dgram += remote_dest.encode('ascii') + b"\n"
+            dgram += data
+            return self._dgram_sock.sendto(dgram, self._samDgramAddr)
+        else:
+            # drop becasue we don't have the address known
+            pass
             
     @samState(State.Running, State.Ready)
     @samType(SAM.SOCK_DGRAM, SAM.SOCK_RAW)
@@ -368,26 +419,22 @@ class Socket(object):
         if addr == self._samDgramAddr:
             # only accept packets from the sam udp address
             idx = data.index(b'\n')
-            return data[:idx], data[1+idx:]
+            return datatypes.Destination(raw=data[:idx], b64=True), data[1+idx:]
         else:
             self._log.warn("invalid source address for sam packet {}".format(addr))
         
     def fileno(self):
         if self._type == SAM.SOCK_STREAM:
-            return self._data_sock.fileno()
+            return self._samSocket.fileno()
         elif self._type == SAM.SOCK_DGRAM:
             return self._dgram_sock.fileno()
         
     @samState(State.Running)
     def shutdown(self, flag):
-        """
-        shutdown sending/recving
-        :param flag: 
-        """
-        if self._type == SAM.SOCK_STREAM:
-            return self._data_sock.shutdown(flag)
-        elif self._type == SAM.SOCK_DGRAM:
-            return self._dgram_sock.shutdown(flag)
+        retval = self._samSocket.shutdown(flag)
+        if self._type == SAM.SOCK_DGRAM:
+            retval |= self._dgram_sock.shutdown(flag)
+        return retval
 
     @samState(State.Running, State.Established, State.Ready)
     def close(self):
@@ -398,20 +445,43 @@ class Socket(object):
         self._samSocket.close()
         self._state = State.Closed
         
-    @samState(State.Established, State.Running, State.Ready, State.Connecting)
     def lookup(self, name):
         """
         look up a name
         :param name: a name or b32 address
-        :returns a b64 destination string:
+        :returns an i2p.datatypes.Destination instance:
         """
+        if isinstance(name, datatypes.Destination):
+            # if it's already a destination return it :p
+            return name
         # check cache
         if name in self._dest_cache:
+            # cache hit
             return self._dest_cache[name]
         # cache miss, do lookup
-        repl = _sam_cmd(self._samSocket, "NAMING LOOKUP NAME={}".format(name))
-        if 'VALUE' in repl.opts:
-            dest = repl.opts['VALUE']
-            self._dest_cache[name] = dest
-            return dest
-        
+        # create new socket for lookup
+        sock = pysocket.socket()
+        try:
+            sock.connect(self._samAddr)
+            self._samHandshake(sock)
+        except pysocket.timeout as ex:
+            raise ex
+        except pysocket.error as ex:
+            raise ex
+        else:
+            # do lookup
+            repl = _sam_cmd(sock, "NAMING LOOKUP NAME={}".format(name))
+            # close socket as it is not needed anymore
+            sock.close()
+            if 'VALUE' in repl.opts:
+                dest = datatypes.Destination(raw=repl.opts['VALUE'], b64=True)
+                if not name.endswith(".b32.i2p"):
+                    # cache name as it's not a b32 address
+                    self._dest_cache[name] = dest                    
+                # cache base32 address
+                self._dest_cache[dest.base32()] = dest
+                return dest
+            else:
+                # failed to lookup
+                # TODO: should this be an error?
+                raise Exception("name not resolved: {}".format(name))

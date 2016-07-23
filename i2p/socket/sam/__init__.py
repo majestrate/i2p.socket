@@ -15,7 +15,8 @@ SHUT_WR = pysocket.SHUT_WR
 SHUT_RDWR = pysocket.SHUT_RDWR
 
 # Address family for i2p
-# what! 9000?!
+# <vegita> IT'S OVER 9000!!!!
+# <psi> what!!!! 9000?!!!!
 AF_I2P = 9002
 
 # pysocket address families
@@ -48,7 +49,8 @@ class i2p_socket:
         self.recvfrom = sock.recvfrom
         self.fileno = sock.fileno
         self.accept = sock.accept
-        self.getsocketinfo = sock.getsocketinfo
+        self.getsocketname = sock.getsocketname
+        self.getpeername = sock.getpeername
 
 def socket(family=AF_I2P, type=SOCK_STREAM, proto=0, samaddr=('127.0.0.1', 7656), dgramaddr=('127.0.0.1', 7655), dgrambind=('127.0.0.1', 0)):
     """

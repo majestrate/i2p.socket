@@ -172,7 +172,7 @@ class ElGamalKey(CryptoKey):
         return self.key.has_private()
 
     def _to_public(self):
-        return ElGamalKey(key=ElGamalKey._construct(key.y, None))
+        return ElGamalKey(key=ElGamalKey._construct(self.key.y, None))
 
     def _get_pubkey(self):
         return int(self.key.y).to_bytes(256, 'big')

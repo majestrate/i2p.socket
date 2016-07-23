@@ -8,12 +8,21 @@ class TestSocket(TestCase):
         """
         test socket connections
         """
-        sock = socket.socket(socket.AF_I2P)
-        sock.connect(("str4d.i2p", 80))
+        sock = socket.socket()
+        sock.connect(("psi.i2p", 80))
         sock.close()
 
         
     def test_bind(self):
         """
-        TODO: implement
+        test socket bind
         """
+        ssock = socket.socket()
+        ssock.bind(None)
+        csock = socket.socket()
+        csock.connect(ssock.getsocketname())
+        asock, addr = ssock.accept()
+        asock.close()
+        csock.close()
+        ssock.close()
+        
