@@ -9,20 +9,20 @@ Requirements:
 * Java I2P 0.9.14 and higher or i2pd 2.4.0 and higher
 
 Installing:
-::
-    pip install i2psocket
 
-Or from git:
-::
+pypi:
+.. code:: bash
+    pip install i2p.socket
+
+git:
+.. code:: bash
     git clone https://github.com/majestrate/i2p.socket/
     cd i2p.socket
     python setup.py install
 
 Usage:
-::
+.. code:: python
     from i2p import socket 
-
-
     
     # i2p socket
     sock = socket.socket()
