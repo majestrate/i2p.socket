@@ -23,7 +23,7 @@ if sys.version_info[0] < 3:
 version = '0.2'
 
 setup(
-    name='i2psocket',
+    name='i2p.socket',
     description='I2P socket module',
     long_description=long_description,
     author='Jeff',
