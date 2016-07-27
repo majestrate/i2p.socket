@@ -20,7 +20,7 @@ if os.path.exists(install_requires_fname):
 if sys.version_info[0] < 3:
     install_requires.append("future>=0.14.0")
 
-version = '0.1'
+version = '0.2'
 
 setup(
     name='i2psocket',
@@ -43,7 +43,7 @@ setup(
         'Programming Language :: Python :: 3.4',
         'Topic :: Internet',
     ],
-    license='Public Domain',
+    license='MIT',
     version=version,
     install_requires=install_requires,
     packages=['i2p', 'i2p.socket', 'i2p.socket.sam'],
