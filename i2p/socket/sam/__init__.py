@@ -69,5 +69,5 @@ def create_connection(address, timeout=60, source_address=None):
 
 def getaddrinfo(host, *args, **kwargs):
     if host.endswith(".i2p"):
-        return [(AF_SAM, SOCK_STREAM, 0, host, 0)]
+        return [(AF_I2P, SOCK_STREAM, 0, host, 0)]
     return pysocket.getaddrinfo(host, *args, **kwargs)

@@ -43,3 +43,11 @@ Usage:
           sock.send(b"GET /\r\n\r\n")
           print (sock.recv(1024))
           sock.close()
+
+
+
+Caveats:
+
+* Probably contains bugs  
+
+          
