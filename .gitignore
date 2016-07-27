@@ -2,9 +2,9 @@
 .\#*
 \#*
 *.pyc
-build
-dist
+build/
+dist/
 __pycache__
-.tox
-.cache
+.tox/
+.cache/
 *.egg-info
