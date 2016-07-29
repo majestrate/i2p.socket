@@ -79,7 +79,6 @@ be used with the select module as they implement the fileno() method.
 Install today!
 """
 
-from i2p.socket.exceptions import error, herror, gaierror, timeout
 # default to sam backend
 from i2p.socket.sam import *
 

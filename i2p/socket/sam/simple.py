@@ -9,6 +9,7 @@ from i2p import datatypes
 from enum import Enum
 
 import collections
+import errno
 import logging
 import os
 import string
@@ -17,7 +18,11 @@ import socket as pysocket
 
 from contextlib import wraps
 
+# Address family for i2p
+# TODO: fix this
+AF_I2P = pysocket.AF_INET
 
+_defaultSAMAddr = ('127.0.0.1', 7656)
 
 class State(Enum):
     """
@@ -68,9 +73,9 @@ class SAM:
     """
     decorator constants
     """
-    SOCK_STREAM = datatypes.I2CPProtocol.STREAMING
-    SOCK_DGRAM = datatypes.I2CPProtocol.DGRAM
-    SOCK_RAW = datatypes.I2CPProtocol.RAW
+    SOCK_STREAM = pysocket.SOCK_STREAM #datatypes.I2CPProtocol.STREAMING
+    SOCK_DGRAM = pysocket.SOCK_DGRAM #datatypes.I2CPProtocol.DGRAM
+    SOCK_RAW = pysocket.SOCK_RAW #datatypes.I2CPProtocol.RAW
 
 def randnick(l):
     nick = ''
@@ -127,15 +132,14 @@ class _WrappedPySocket(object):
     """
     
     def __init__(self, pysock, localdest, remotedest):
-        self.send = pysock.send
-        self.recv = pysock.recv
-        self.fileno = pysock.fileno
-        self.close = pysock.close
-        self.shutdown = pysock.shutdown
         self.getpeername = lambda : remotedest
         self.getsocketname = lambda : localdest
+        self.get_inheritable = lambda : False
+        self.family = AF_I2P
+        for attr in ('type', 'proto', 'send', 'recv', 'sendall', 'sendfile', 'fileno', 'close', 'shutdown', 'detach', 'makefile', 'setsockopt', 'getsockopt', 'setblocking', 'settimeout'):
+            if hasattr(pysock, attr):
+                setattr(self, attr, getattr(pysock, attr))
         
-
 class Socket(object):
     """
     base of all sam socket objects
@@ -157,10 +161,10 @@ class Socket(object):
     def samType(*types):
         def f(func):
             def check_type(self, *args, **kwargs):
-                if self._type in types:
+                if self.type in types:
                     return func(self, *args, **kwargs)
                 else:
-                    raise Exception("invalid socket type: {}".format(self._type))
+                    raise Exception("invalid socket type: {}".format(self.type))
             return check_type
         return f
 
@@ -196,7 +200,8 @@ class Socket(object):
             self._samSocket = None
             self._data_sock = None
             self._state = State.Initial
-            self._type = socketType
+            self._deferred_socket_actions = list()
+            self.type = socketType
             self.dest = None
             self.socketname = None
         else:
@@ -216,7 +221,7 @@ class Socket(object):
             self._state = State.Established
         else:
             self._state = State.Error
-            raise Exception("failed to handshake with SAM: {}".format(repl.opts["RESULT"]))
+            raise pysocket.error(errno.ENOTCONN, "failed to handshake with SAM: {}".format(repl.opts["RESULT"]))
         
         
     @samConnect
@@ -255,11 +260,13 @@ class Socket(object):
             repl = _sam_cmd(self._data_sock, cmd)
             if repl.opts["RESULT"] == "OK":
                 self._state = State.Running
+                # apply deferred
+                self._apply_defered_socket_props(self._data_sock)
                 # connect okay
                 return
         # TODO: raise correct exceptions for error messages
         # either handshake fail or stream connect fail
-        raise Exception("cannot connect to {}: {}".format(dest, repl))
+        raise pysocket.error(errno.EHOSTUNREACH, "cannot connect to {}: {}".format(addr, repl))
 
     def getsocketname(self):
         if self.dest:
@@ -268,10 +275,20 @@ class Socket(object):
     def getpeername(self):
         return self._peer
 
+    def _apply_defered_socket_props(self, sock):
+        """
+        apply defered socket actions
+        """
+        # execute each defered action
+        for action in self._deferred_socket_actions:
+            action(sock)
+        # reset actions
+        self._deferred_socket_actions = list()
+    
     @samConnect
     @samState(State.Established)
     @samType(SAM.SOCK_STREAM)
-    def listen(self, n):
+    def listen(self, n=0):
         return
     
     @samConnect
@@ -287,15 +304,17 @@ class Socket(object):
         if nickname is None:
             nickname = randnick(8)
         self._state = State.Connecting
-        if self._type == SAM.SOCK_STREAM:
+        if self.type == SAM.SOCK_STREAM:
             style = "STREAM"
-        elif self._type == SAM.SOCK_DGRAM:
+        elif self.type == SAM.SOCK_DGRAM:
             style = "DATAGRAM"
             self._dgram_sock = pysocket.socket(type=pysocket.SOCK_DGRAM)
             self._dgram_sock.bind(self._dgram_bind)
             port = self._dgram_sock.getsockname()[1]
             i2cpOptions["HOST"] = self._dgram_bind[0]
             i2cpOptions["PORT"] = port
+            # apply deferred options
+            self._apply_defered_socket_props(self._dgram_sock)
         else:
             # TODO: implement
             style = "RAW"
@@ -329,11 +348,14 @@ class Socket(object):
                     elif hasattr(keyfile, "write"):
                         keyfile.write(data)
             self.socketname = nickname
+            # TODO: do we really want to do this?
+            self._apply_defered_socket_props(self._samSocket)
             self._state = State.Ready
         else:
             self._state = State.Error
             # TODO: different types of errors for different types of results from sam
-            raise Exception("bad result from sam: {}".format(repl.opts["RESULT"]))
+            raise pysocket.error(errno.EADDRNOTAVAIL, "failed to bind destination with i2p: {}".format(repl.opts["RESULT"]))
+                                                                                                       
 
     @samState(State.Ready)
     @samType(SAM.SOCK_STREAM)
@@ -359,7 +381,7 @@ class Socket(object):
                 # return socket
                 return sock, dest
         # TODO: raise appropriate errors
-        raise Exception("failed to accept: {}".format(repl))
+        raise pysocket.error(errno.ENOTCONN, "failed to accept")
             
     @samState(State.Running)
     @samType(SAM.SOCK_STREAM)
@@ -373,14 +395,27 @@ class Socket(object):
         
     @samState(State.Running)
     @samType(SAM.SOCK_STREAM)
-    def recv(self, buffersize, flags=0):
+    def recv(self, nbytes, flags=0):
         """
         recv bytes from endpoint we are connected to
-        :param buffersize: number of bytes
+        :param nbytes: number of bytes
         :return bytearry containing <= n bytes:
         """
-        return self._data_sock.recv(buffersize, flags)
+        return self._data_sock.recv(nbytes, flags)
 
+    @samState(State.Running)
+    @samType(SAM.SOCK_STREAM)
+    def recv_into(self, buffer, nbytes=None, flags=0):
+        """
+        recv bytes from endpoint we are connected into buffer
+        :param buffer: buffer to recv into
+        :param nbytes: number of bytes
+        :return bytearry containing <= n bytes:
+        """
+        return self._data_sock.recv_into(buffer, nbytes, flags)
+
+    
+    
     @samState(State.Running, State.Ready)
     @samType(SAM.SOCK_DGRAM, SAM.SOCK_RAW)
     def sendto(self, data, address):
@@ -408,33 +443,61 @@ class Socket(object):
             
     @samState(State.Running, State.Ready)
     @samType(SAM.SOCK_DGRAM, SAM.SOCK_RAW)
-    def recvfrom(self, buffersize, flags=0):
+    def recvfrom(self, nbytes, flags=0):
         """
         recv bytes from a remote sender
-        :param buffersize: number of bytes to recv max
+        :param nbytes: number of bytes to recv max
         :return (data, addressInfo):
         """
-        self._log.debug('recvfrom {}'.format(buffersize))
+        data, addr = self._dgram_sock.recvfrom(nbytes)
+        if addr == self._samDgramAddr:
+            # only accept packets from the sam udp address
+            idx = data.index(b'\n')
+            return datatypes.Destination(raw=data[:idx], b64=True), bytearray(data[1+idx:])
+        else:
+            self._log.warn("invalid source address for sam packet {}".format(addr))
+
+    @samState(State.Running, State.Ready)
+    @samType(SAM.SOCK_DGRAM, SAM.SOCK_RAW)
+    def recvfrom_into(self, buffer, nbytes=None, flags=0):
+        """
+        recv bytes from a remote sender
+        :param buffer: buffer to recv into
+        :param nbytes: number of bytes to recv max
+        :return (nbytes, addressInfo):
+        """
+        if nbytes is None:
+            nbytes = len(buffer)
         data, addr = self._dgram_sock.recvfrom(buffersize)
         if addr == self._samDgramAddr:
             # only accept packets from the sam udp address
             idx = data.index(b'\n')
-            return datatypes.Destination(raw=data[:idx], b64=True), data[1+idx:]
+            payload = data[1+idx:]
+            l = buffer.write(payload)
+            return l, datatypes.Destination(raw=bytearray(data[:idx]), b64=True)
         else:
             self._log.warn("invalid source address for sam packet {}".format(addr))
-        
+
+    
+            
     def fileno(self):
-        if self._type == SAM.SOCK_STREAM:
-            return self._samSocket.fileno()
-        elif self._type == SAM.SOCK_DGRAM:
+        if self.type == SAM.SOCK_STREAM:
+            if self._samSocket:
+                return self._samSocket.fileno()
+            else:
+                return self._data_sock.fileno()
+        elif self.type == SAM.SOCK_DGRAM:
             return self._dgram_sock.fileno()
         
     @samState(State.Running)
     def shutdown(self, flag):
-        retval = self._samSocket.shutdown(flag)
-        if self._type == SAM.SOCK_DGRAM:
-            retval |= self._dgram_sock.shutdown(flag)
-        return retval
+        if self.type == SAM.SOCK_DGRAM:
+            return self._dgram_sock.shutdown(flag)
+        elif self.type == SAM.SOCK_STREAM:
+            if self._samSocket:
+                return self._samSocket.shutdown(flag)
+            else:
+                return self._data_sock.shutdown(flag)
 
     @samState(State.Running, State.Established, State.Ready)
     def close(self):
@@ -442,7 +505,13 @@ class Socket(object):
         close the connection
         """
         self._state = State.Closing
-        self._samSocket.close()
+        if self._samSocket is not None:
+            self._samSocket.close()
+        if self.type == SAM.SOCK_DGRAM:
+            self._dgram_sock.close()
+        elif self.type == SAM.SOCK_STREAM and self._data_sock is not None:
+            self._data_sock.close()
+
         self._state = State.Closed
         
     def lookup(self, name):
@@ -483,5 +552,92 @@ class Socket(object):
                 return dest
             else:
                 # failed to lookup
-                # TODO: should this be an error?
-                raise Exception("name not resolved: {}".format(name))
+                raise pysocket.herror(errno.EAGAIN, "name not resolved: {}".format(name))
+
+    def settimeout(self, value):
+        sock = None
+        if self.type == SAM.SOCK_STREAM:
+            sock = self._data_sock
+        elif self.type == SAM.SOCK_DGRAM:
+            sock = self._dgram_sock
+        elif self._samSocket is not None:
+            sock = self._samSocket
+        if sock:
+            sock.settimeout(value)
+        else:
+            # defer setting timeout until we have a socket
+            self._deferred_socket_actions.append(lambda s : s.settimeout(value))
+
+    def setsockopt(self, level, optname, value):
+        sock = None
+        if self.type == SAM.SOCK_STREAM:
+            sock = self._data_sock
+        elif self.type == SAM.SOCK_DGRAM:
+            sock = self._dgram_sock
+        if sock:
+            sock.setsockopt(level, optname, value)
+        else:
+            # defer setting, no socket yet
+            self._deferred_socket_actions.append(lambda s : s.setsockopt(level, optname, value))
+
+    def gettimeout(self):
+        if self.type == SAM.SOCK_STREAM:
+            return self._data_sock.gettimeout()
+        elif self.type == SAM.SOCK_DGRAM:
+            return self._dgram_sock.gettimeout()
+        else:
+            # TODO: implement this?
+            return None
+            
+    def setblocking(self, flag):
+        sock = None
+        if self.type == SAM.SOCK_STREAM:
+            sock = self._data_sock
+        elif self.type == SAM.SOCK_DGRAM:
+            sock = self._dgram_sock
+        if sock:
+            sock.setblocking(flag)
+        elif flag is not None:
+            # if we have no socket yet, add this to be executed later
+            self._deferred_socket_actions.append(lambda s : s.setblocking(flag))
+
+    def makefile(self, mode='r', buffering=None, *args, encoding=None, errors=None, newline=None):
+        if self.type == SAM.SOCK_STREAM and self._data_sock:
+            return self._data_sock.makefile(mode, buffering, *args, encoding, errors, newline)
+        else:
+            # TODO: exception?
+            return None
+        
+def lookup(name, samAddr=_defaultSAMAddr):
+    """
+    lookup an i2p name
+    :returns i2p.datatypes.Destination:
+    """
+    sock = pysocket.socket()
+    if isinstance(name, datatypes.Destination):
+        # if it's already a destination return it :p
+        return name
+    # create new socket for lookup
+    sock = pysocket.socket()
+    try:
+        sock.connect(_samAddr)
+        repl = _sam_cmd(sock, 'HELLO VERSION MIN=3.0 MAX=3.2')
+        if repl.opts['RESULT'] != 'OK':
+            # fail to handshake
+            sock.close()
+            raise pysocket.error(errno.EAGAIN, "cannot connect to i2p router")
+    except pysocket.timeout as ex:
+        raise ex
+    except pysocket.error as ex:
+        raise ex
+    else:
+        # do lookup
+        repl = _sam_cmd(sock, "NAMING LOOKUP NAME={}".format(name))
+        # close socket as it is not needed anymore
+        sock.close()
+        if 'VALUE' in repl.opts:
+            dest = datatypes.Destination(raw=repl.opts['VALUE'], b64=True)
+            return dest
+        else:
+            # failed to lookup
+            raise pysocket.herror(errno.EAGAIN, "name not resolved: {}".format(name))
