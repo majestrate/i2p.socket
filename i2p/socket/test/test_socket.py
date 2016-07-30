@@ -20,7 +20,7 @@ class TestSocket(TestCase):
         ssock = socket.socket()
         ssock.bind(None)
         csock = socket.socket()
-        csock.connect(ssock.getsocketname())
+        csock.connect(ssock.getsockname())
         asock, addr = ssock.accept()
         asock.close()
         csock.close()
