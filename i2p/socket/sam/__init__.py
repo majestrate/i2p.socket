@@ -19,13 +19,15 @@ class i2p_socket:
         self.close = sock.close
         self.bind = sock.bind
         self.send = sock.send
+        self.sendall = sock.sendall
         self.connect = sock.connect
         self.sendto = sock.sendto
         self.recvfrom = sock.recvfrom
         self.fileno = sock.fileno
         self.accept = sock.accept
-        self.getsocketname = sock.getsocketname
+        self.getsockname = sock.getsockname
         self.getpeername = sock.getpeername
+        self.makefile = sock.makefile
         self.family = AF_I2P
         self.type = type
         self.proto = proto
