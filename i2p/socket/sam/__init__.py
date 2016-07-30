@@ -26,6 +26,7 @@ class i2p_socket:
         self.accept = sock.accept
         self.getsockname = sock.getsockname
         self.getpeername = sock.getpeername
+        self.makefile = sock.makefile
         self.family = AF_I2P
         self.type = type
         self.proto = proto

@@ -147,7 +147,7 @@ class Socket(object):
 
     _log = logging.getLogger("i2p.socket.sam.simple.BaseSocket")
     _dest_cache = dict()
-    
+
     def samState(*states):
         def f(func):
             def check_state(self, *args_inner, **kwargs_inner):
@@ -601,9 +601,9 @@ class Socket(object):
             # if we have no socket yet, add this to be executed later
             self._deferred_socket_actions.append(lambda s : s.setblocking(flag))
 
-    def makefile(self, mode='r', buffering=None, *args, encoding=None, errors=None, newline=None):
+    def makefile(self, *args, **kwargs):
         if self.type == SAM.SOCK_STREAM and self._data_sock:
-            return self._data_sock.makefile(mode, buffering, *args, encoding, errors, newline)
+            return self._data_sock.makefile(*args, **kwargs)
         else:
             # TODO: exception?
             return None
