@@ -83,20 +83,27 @@ def randnick(l):
         nick += random.choice(string.ascii_letters)
     return nick
     
-def _sam_readline(sock):
+def _sam_readline(sock, partial=''):
     """
     read a line from a sam control socket
     """
     response = bytearray()
+    finished = True
     while True:
-        c = sock.recv(1)
-        if c:
-            if c == b'\n':
+        try:
+            c = sock.recv(1)
+            if c:
+                if c == b'\n':
+                    break
+                response += c
+            else:
                 break
-            response += c
-        else:
+        except pysocket.error as err:
+            if ex.args[0] != errno.EWOULDBLOCK:
+                raise
+            finished = False
             break
-    return response.decode('ascii')
+    return partial+response.decode('ascii'), finished
 
 SamReply = collections.namedtuple('SamReply', ['cmd', 'opts'])
 
@@ -123,7 +130,7 @@ def _sam_cmd(sock, line):
     """
     line = bytearray(line, 'ascii') + b'\n'
     sock.send(line)
-    _line = _sam_readline(sock)
+    _line, _finished = _sam_readline(sock)
     return _sam_parse_reply(_line)
 
 class _WrappedPySocket(object):
@@ -201,6 +208,8 @@ class Socket(object):
             self._data_sock = None
             self._state = State.Initial
             self._deferred_socket_actions = list()
+            self._blocking_flag = 1 # Default blocking
+            self._pending_accept = None
             self.type = socketType
             self.dest = None
             self.socketname = None
@@ -360,29 +369,47 @@ class Socket(object):
     @samState(State.Ready)
     @samType(SAM.SOCK_STREAM)
     def accept(self):
-        # connect to sam
-        sock = pysocket.socket()
-        sock.connect(self._samAddr)
-        # say hello
-        repl = _sam_cmd(sock, 'HELLO VERSION MIN=3.0 MAX=3.2')
-        if repl.opts["RESULT"] == "OK":
+        # TODO: raise appropriate errors
+        if not self._pending_accept:
+            # Handle case where we are being used inside gevent
+            sock = None
+            try:
+                from gevent import monkey
+                if monkey.is_object_patched('socket', 'socket'):
+                    sock = monkey.get_original('socket', 'socket')()
+            except:
+                pass
+            if not sock:
+                sock = pysocket.socket()
+            # connect to sam
+            sock.connect(self._samAddr)
+            # say hello
+            repl = _sam_cmd(sock, 'HELLO VERSION MIN=3.0 MAX=3.2')
+            if repl.opts["RESULT"] != "OK":
+                raise pysocket.error(errno.ENOTCONN, "failed to accept: %s" % repl.opts['RESULT'])
             # send command
             cmd = 'STREAM ACCEPT ID={} SILENT=false'.format(self.socketname)
             repl = _sam_cmd(sock, cmd)
-            if repl.opts['RESULT'] == 'OK':
-                # read destination for inbound
-                dest = _sam_readline(sock)
-                # parse destination
-                dest = datatypes.Destination(raw=dest, b64=True)
-                # cache b32 address
-                self._dest_cache[dest.base32()] = dest
-                # override socket functions
-                sock = _WrappedPySocket(sock, self.dest, dest)
-                # return socket
-                return sock, dest
-        # TODO: raise appropriate errors
-        raise pysocket.error(errno.ENOTCONN, "failed to accept")
-            
+            if repl.opts['RESULT'] != 'OK':
+                raise pysocket.error(errno.ENOTCONN, "failed to accept: %s" % repl.opts['RESULT'])
+            sock.setblocking(self._blocking_flag)
+            self._pending_accept = (sock, '')
+        sock, partialDest = self._pending_accept
+        # read destination for inbound
+        dest, _finished = _sam_readline(sock, partialDest)
+        if not _finished:
+            self._pending_accept = (sock, dest)
+            raise pysocket.error(errno.EWOULDBLOCK, "waiting for client to connect")
+        self._pending_accept = None
+        # parse destination
+        dest = datatypes.Destination(raw=dest, b64=True)
+        # cache b32 address
+        self._dest_cache[dest.base32()] = dest
+        # override socket functions
+        sock = _WrappedPySocket(sock, self.dest, dest)
+        # return socket
+        return sock, dest
+
     @samState(State.Running)
     @samType(SAM.SOCK_STREAM)
     def send(self, data, flags=0):
@@ -600,6 +627,7 @@ class Socket(object):
             return None
             
     def setblocking(self, flag):
+        self._blocking_flag = flag
         sock = None
         if self.type == SAM.SOCK_STREAM:
             sock = self._data_sock
