@@ -295,11 +295,10 @@ class Socket(object):
         self._deferred_socket_actions = list()
     
     @samConnect
-    @samState(State.Established)
     @samType(SAM.SOCK_STREAM)
     def listen(self, n=0):
         return
-    
+
     @samConnect
     @samState(State.Established)
     @samType(SAM.SOCK_STREAM, SAM.SOCK_DGRAM)

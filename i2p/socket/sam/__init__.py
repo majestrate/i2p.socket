@@ -17,6 +17,7 @@ class i2p_socket:
         sock = simple.Socket(samaddr, dgramaddr, dgrambind, type)
         self.recv = sock.recv
         self.close = sock.close
+        self.listen = sock.listen
         self.bind = sock.bind
         self.send = sock.send
         self.sendall = sock.sendall
