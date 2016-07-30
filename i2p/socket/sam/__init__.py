@@ -19,6 +19,7 @@ class i2p_socket:
         self.close = sock.close
         self.bind = sock.bind
         self.send = sock.send
+        self.sendall = sock.sendall
         self.connect = sock.connect
         self.sendto = sock.sendto
         self.recvfrom = sock.recvfrom

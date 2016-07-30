@@ -395,6 +395,16 @@ class Socket(object):
         
     @samState(State.Running)
     @samType(SAM.SOCK_STREAM)
+    def sendall(self, data, flags=0):
+        """
+        send to remote endpoint we are connected to until done or error
+        :param data: bytearray of data
+        :return None:
+        """
+        return self._data_sock.sendall(data, flags)
+
+    @samState(State.Running)
+    @samType(SAM.SOCK_STREAM)
     def recv(self, nbytes, flags=0):
         """
         recv bytes from endpoint we are connected to
