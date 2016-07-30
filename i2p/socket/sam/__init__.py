@@ -24,7 +24,7 @@ class i2p_socket:
         self.recvfrom = sock.recvfrom
         self.fileno = sock.fileno
         self.accept = sock.accept
-        self.getsocketname = sock.getsocketname
+        self.getsockname = sock.getsockname
         self.getpeername = sock.getpeername
         self.family = AF_I2P
         self.type = type

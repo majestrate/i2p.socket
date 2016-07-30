@@ -133,7 +133,7 @@ class _WrappedPySocket(object):
     
     def __init__(self, pysock, localdest, remotedest):
         self.getpeername = lambda : remotedest
-        self.getsocketname = lambda : localdest
+        self.getsockname = lambda : localdest
         self.get_inheritable = lambda : False
         self.family = AF_I2P
         for attr in ('type', 'proto', 'send', 'recv', 'sendall', 'sendfile', 'fileno', 'close', 'shutdown', 'detach', 'makefile', 'setsockopt', 'getsockopt', 'setblocking', 'settimeout'):
@@ -268,7 +268,7 @@ class Socket(object):
         # either handshake fail or stream connect fail
         raise pysocket.error(errno.EHOSTUNREACH, "cannot connect to {}: {}".format(addr, repl))
 
-    def getsocketname(self):
+    def getsockname(self):
         if self.dest:
             return self.dest.to_public()
 
