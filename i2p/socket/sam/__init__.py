@@ -15,24 +15,28 @@ class i2p_socket:
         create an i2p socket
         """
         sock = simple.Socket(samaddr, dgramaddr, dgrambind, type)
-        self.recv = sock.recv
-        self.close = sock.close
-        self.listen = sock.listen
+
+        # Methods
+        self.accept = sock.accept
         self.bind = sock.bind
+        self.close = sock.close
+        self.connect = sock.connect
+        self.fileno = sock.fileno
+        self.getpeername = sock.getpeername
+        self.getsockname = sock.getsockname
+        self.gettimeout = sock.gettimeout
+        self.listen = sock.listen
+        self.makefile = sock.makefile
+        self.recv = sock.recv
+        self.recvfrom = sock.recvfrom
         self.send = sock.send
         self.sendall = sock.sendall
-        self.connect = sock.connect
         self.sendto = sock.sendto
-        self.recvfrom = sock.recvfrom
-        self.fileno = sock.fileno
-        self.accept = sock.accept
-        self.getsockname = sock.getsockname
-        self.getpeername = sock.getpeername
-        self.makefile = sock.makefile
+
+        # Attributes
         self.family = AF_I2P
         self.type = type
         self.proto = proto
-        self.gettimeout = sock.gettimeout
         
         
 def socket(family=AF_I2P, type=SOCK_STREAM, proto=0, samaddr=('127.0.0.1', 7656), dgramaddr=('127.0.0.1', 7655), dgrambind=('127.0.0.1', 0)):
