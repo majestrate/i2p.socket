@@ -29,9 +29,15 @@ class i2p_socket:
         self.makefile = sock.makefile
         self.recv = sock.recv
         self.recvfrom = sock.recvfrom
+        self.recvfrom_into = sock.recvfrom_into
+        self.recv_into = sock.recv_into
         self.send = sock.send
         self.sendall = sock.sendall
         self.sendto = sock.sendto
+        self.setblocking = sock.setblocking
+        self.setsockopt = sock.setsockopt
+        self.settimeout = sock.settimeout
+        self.shutdown = sock.shutdown
 
         # Attributes
         self.family = AF_I2P
