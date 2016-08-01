@@ -99,7 +99,7 @@ def _sam_readline(sock, partial=''):
             else:
                 break
         except pysocket.error as err:
-            if ex.args[0] != errno.EWOULDBLOCK:
+            if err.args[0] != errno.EWOULDBLOCK:
                 raise
             finished = False
             break
