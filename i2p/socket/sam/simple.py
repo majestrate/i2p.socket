@@ -591,6 +591,10 @@ class Socket(object):
                 raise pysocket.herror(errno.EAGAIN, "name not resolved: {}".format(name))
 
     def settimeout(self, value):
+        if value is None:
+            self._blocking_flag = 1
+        elif value == 0.0:
+            self._blocking_flag = 0
         sock = None
         if self.type == SAM.SOCK_STREAM:
             sock = self._data_sock
