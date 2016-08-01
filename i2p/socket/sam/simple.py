@@ -216,10 +216,9 @@ class Socket(object):
         else:
             raise ValueError("samaddr must not be None")
 
-    
-        
-        
-                
+    def getPrivateDest(self):
+        return self.dest
+
     def _samHandshake(self, sock):
         """
         handshake with sam via a socket.socket instance

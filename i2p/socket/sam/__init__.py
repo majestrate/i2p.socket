@@ -43,8 +43,11 @@ class i2p_socket:
         self.family = AF_I2P
         self.type = type
         self.proto = proto
-        
-        
+
+        # SAM-specific attributes
+        self.getPrivateDest = sock.getPrivateDest
+
+
 def socket(family=AF_I2P, type=SOCK_STREAM, proto=0, samaddr=('127.0.0.1', 7656), dgramaddr=('127.0.0.1', 7655), dgrambind=('127.0.0.1', 0)):
     """
     wraps socket.socket
