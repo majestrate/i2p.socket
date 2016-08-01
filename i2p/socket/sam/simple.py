@@ -99,7 +99,7 @@ def _sam_readline(sock, partial=''):
             else:
                 break
         except pysocket.error as err:
-            if ex.args[0] != errno.EWOULDBLOCK:
+            if err.args[0] != errno.EWOULDBLOCK:
                 raise
             finished = False
             break
@@ -209,17 +209,16 @@ class Socket(object):
             self._state = State.Initial
             self._deferred_socket_actions = list()
             self._blocking_flag = 1 # Default blocking
-            self._pending_accept = None
+            self._pending_accepts = []
             self.type = socketType
             self.dest = None
             self.socketname = None
         else:
             raise ValueError("samaddr must not be None")
 
-    
-        
-        
-                
+    def getPrivateDest(self):
+        return self.dest
+
     def _samHandshake(self, sock):
         """
         handshake with sam via a socket.socket instance
@@ -293,11 +292,38 @@ class Socket(object):
             action(sock)
         # reset actions
         self._deferred_socket_actions = list()
-    
+
     @samConnect
     @samType(SAM.SOCK_STREAM)
     def listen(self, n=0):
-        return
+        for i in range(0, n+1):
+            self._pending_accepts.append(self._create_accept())
+
+    def _create_accept(self):
+        # TODO: raise appropriate errors
+        # Handle case where we are being used inside gevent
+        sock = None
+        try:
+            from gevent import monkey
+            if monkey.is_object_patched('socket', 'socket'):
+                sock = monkey.get_original('socket', 'socket')()
+        except:
+            pass
+        if not sock:
+            sock = pysocket.socket()
+        # connect to sam
+        sock.connect(self._samAddr)
+        # say hello
+        repl = _sam_cmd(sock, 'HELLO VERSION MIN=3.0 MAX=3.2')
+        if repl.opts["RESULT"] != "OK":
+            raise pysocket.error(errno.ENOTCONN, "failed to accept: %s" % repl.opts['RESULT'])
+        # send command
+        cmd = 'STREAM ACCEPT ID={} SILENT=false'.format(self.socketname)
+        repl = _sam_cmd(sock, cmd)
+        if repl.opts['RESULT'] != 'OK':
+            raise pysocket.error(errno.ENOTCONN, "failed to accept: %s" % repl.opts['RESULT'])
+        sock.setblocking(self._blocking_flag)
+        return (sock, '')
 
     @samConnect
     @samState(State.Established)
@@ -363,43 +389,20 @@ class Socket(object):
             self._state = State.Error
             # TODO: different types of errors for different types of results from sam
             raise pysocket.error(errno.EADDRNOTAVAIL, "failed to bind destination with i2p: {}".format(repl.opts["RESULT"]))
-                                                                                                       
 
     @samState(State.Ready)
     @samType(SAM.SOCK_STREAM)
     def accept(self):
-        # TODO: raise appropriate errors
-        if not self._pending_accept:
-            # Handle case where we are being used inside gevent
-            sock = None
-            try:
-                from gevent import monkey
-                if monkey.is_object_patched('socket', 'socket'):
-                    sock = monkey.get_original('socket', 'socket')()
-            except:
-                pass
-            if not sock:
-                sock = pysocket.socket()
-            # connect to sam
-            sock.connect(self._samAddr)
-            # say hello
-            repl = _sam_cmd(sock, 'HELLO VERSION MIN=3.0 MAX=3.2')
-            if repl.opts["RESULT"] != "OK":
-                raise pysocket.error(errno.ENOTCONN, "failed to accept: %s" % repl.opts['RESULT'])
-            # send command
-            cmd = 'STREAM ACCEPT ID={} SILENT=false'.format(self.socketname)
-            repl = _sam_cmd(sock, cmd)
-            if repl.opts['RESULT'] != 'OK':
-                raise pysocket.error(errno.ENOTCONN, "failed to accept: %s" % repl.opts['RESULT'])
-            sock.setblocking(self._blocking_flag)
-            self._pending_accept = (sock, '')
-        sock, partialDest = self._pending_accept
+        if len(self._pending_accepts) == 0:
+            # Just in case the user doesn't call listen()
+            self._pending_accepts.append(self._create_accept())
+        sock, partialDest = self._pending_accepts.pop(0)
         # read destination for inbound
         dest, _finished = _sam_readline(sock, partialDest)
         if not _finished:
-            self._pending_accept = (sock, dest)
+            self._pending_accepts.append((sock, dest))
             raise pysocket.error(errno.EWOULDBLOCK, "waiting for client to connect")
-        self._pending_accept = None
+        self._pending_accepts.append(self._create_accept())
         # parse destination
         dest = datatypes.Destination(raw=dest, b64=True)
         # cache b32 address
@@ -591,6 +594,10 @@ class Socket(object):
                 raise pysocket.herror(errno.EAGAIN, "name not resolved: {}".format(name))
 
     def settimeout(self, value):
+        if value is None:
+            self._blocking_flag = 1
+        elif value == 0.0:
+            self._blocking_flag = 0
         sock = None
         if self.type == SAM.SOCK_STREAM:
             sock = self._data_sock
@@ -644,7 +651,23 @@ class Socket(object):
         else:
             # TODO: exception?
             return None
-        
+
+def checkAPIConnection(samaddr=_defaultSAMAddr):
+    sock = pysocket.socket()
+    try:
+        sock.connect(samaddr)
+        repl = _sam_cmd(sock, 'HELLO VERSION MIN=3.0 MAX=3.2')
+        if repl.opts['RESULT'] != 'OK':
+            # fail to handshake
+            sock.close()
+            raise pysocket.error(errno.EAGAIN, "cannot connect to i2p router")
+    except pysocket.timeout as ex:
+        raise ex
+    except pysocket.error as ex:
+        raise ex
+    else:
+        return True
+
 def lookup(name, samAddr=_defaultSAMAddr):
     """
     lookup an i2p name
