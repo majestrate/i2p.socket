@@ -651,7 +651,23 @@ class Socket(object):
         else:
             # TODO: exception?
             return None
-        
+
+def checkAPIConnection(samaddr=_defaultSAMAddr):
+    sock = pysocket.socket()
+    try:
+        sock.connect(samaddr)
+        repl = _sam_cmd(sock, 'HELLO VERSION MIN=3.0 MAX=3.2')
+        if repl.opts['RESULT'] != 'OK':
+            # fail to handshake
+            sock.close()
+            raise pysocket.error(errno.EAGAIN, "cannot connect to i2p router")
+    except pysocket.timeout as ex:
+        raise ex
+    except pysocket.error as ex:
+        raise ex
+    else:
+        return True
+
 def lookup(name, samAddr=_defaultSAMAddr):
     """
     lookup an i2p name

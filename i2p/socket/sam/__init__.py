@@ -8,6 +8,8 @@ from socket import *
 
 AF_I2P = simple.AF_I2P
 
+checkAPIConnection = simple.checkAPIConnection
+
 class i2p_socket:
 
     def __init__(self, type, proto, samaddr, dgramaddr, dgrambind):
