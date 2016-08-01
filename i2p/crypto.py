@@ -7,8 +7,16 @@ from Crypto.Random.random import StrongRandom as random
 from Crypto.Util import asn1
 from pyelliptic.ecc import ECC
 from enum import Enum
-import libnacl
-
+try:
+    import libnacl
+except Exception as ex:
+    # failed for some reason
+    libnacl = None
+    
+# for asserting libnacl is there
+def _assert_libnacl():
+    assert libnacl is not None
+    
 from .util import *
 
 #
@@ -311,7 +319,6 @@ class ECDSA256Key(ECDSAKey):
         super().__init__(SigType.ECDSA_SHA256_P256, pub, priv, key)
 
 
-
 class EdDSAKey(SigningKey):
 
     def __init__(self, pub=None, priv=None, key=None):
@@ -321,11 +328,13 @@ class EdDSAKey(SigningKey):
         If pub or priv are set, creates an Ed25519Key using provided key material.
         If key is se, creates an Ed25519Key using the provided key.
         """
+        _assert_libnacl()
         super().__init__(SigType.EdDSA_SHA512_Ed25519, pub, priv, key)
 
     @staticmethod
     def _parse(pub, priv=None):
         """Parse key data"""
+        _assert_libnacl()
         if priv:
             # if we have private data consider it seed data
             pub, priv = libnacl.crypto_sign_seed_keypair(priv)
@@ -335,6 +344,7 @@ class EdDSAKey(SigningKey):
     def _generate():
         """Generate an Ed25519-SHA512 signing key pair
         """
+        _assert_libnacl()
         return libnacl.crypto_sign_keypair()
     
 
@@ -352,6 +362,7 @@ class EdDSAKey(SigningKey):
 
     def _sign(self, data):
         """Generate EdDSA signature"""
+        _assert_libnacl()
         assert self.key[1] is not None
         assert len(self.key[1]) == libnacl.crypto_sign_SECRETKEYBYTES
 
@@ -364,6 +375,7 @@ class EdDSAKey(SigningKey):
 
     def _verify(self, data, sig):
         """Verify EdDSA signature."""
+        _assert_libnacl()
         assert self.key[0] is not None
         assert len(self.key[0]) == libnacl.crypto_sign_PUBLICKEYBYTES
 
