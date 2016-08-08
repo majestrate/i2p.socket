@@ -528,7 +528,7 @@ class Socket(object):
         elif self.type == SAM.SOCK_DGRAM:
             return self._dgram_sock.fileno()
         
-    @samState(State.Running, state.Established)
+    @samState(State.Running, State.Established)
     def shutdown(self, flag):
         if self.type == SAM.SOCK_DGRAM:
             return self._dgram_sock.shutdown(flag)
