@@ -680,7 +680,7 @@ def lookup(name, samAddr=_defaultSAMAddr):
     # create new socket for lookup
     sock = pysocket.socket()
     try:
-        sock.connect(_samAddr)
+        sock.connect(samAddr)
         repl = _sam_cmd(sock, 'HELLO VERSION MIN=3.0 MAX=3.2')
         if repl.opts['RESULT'] != 'OK':
             # fail to handshake
