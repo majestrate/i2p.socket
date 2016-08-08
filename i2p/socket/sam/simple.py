@@ -455,7 +455,7 @@ class Socket(object):
 
     
     
-    @samState(State.Running, State.Ready)
+    @samState(State.Running, State.Ready, State.Established)
     @samType(SAM.SOCK_DGRAM, SAM.SOCK_RAW)
     def sendto(self, data, address):
         """
@@ -480,7 +480,7 @@ class Socket(object):
             # drop becasue we don't have the address known
             pass
             
-    @samState(State.Running, State.Ready)
+    @samState(State.Running, State.Ready, State.Established)
     @samType(SAM.SOCK_DGRAM, SAM.SOCK_RAW)
     def recvfrom(self, nbytes, flags=0):
         """
@@ -496,7 +496,7 @@ class Socket(object):
         else:
             self._log.warn("invalid source address for sam packet {}".format(addr))
 
-    @samState(State.Running, State.Ready)
+    @samState(State.Running, State.Ready, State.Established)
     @samType(SAM.SOCK_DGRAM, SAM.SOCK_RAW)
     def recvfrom_into(self, buffer, nbytes=None, flags=0):
         """
@@ -528,7 +528,7 @@ class Socket(object):
         elif self.type == SAM.SOCK_DGRAM:
             return self._dgram_sock.fileno()
         
-    @samState(State.Running)
+    @samState(State.Running, state.Established)
     def shutdown(self, flag):
         if self.type == SAM.SOCK_DGRAM:
             return self._dgram_sock.shutdown(flag)
