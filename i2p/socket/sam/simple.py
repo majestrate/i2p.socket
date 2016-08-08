@@ -336,7 +336,7 @@ class Socket(object):
         :param i2cpOptions: additional i2cp options to pass into sam
         """
         if nickname is None:
-            nickname = randnick(8)
+           nickname = randnick(8)
         self._state = State.Connecting
         if self.type == SAM.SOCK_STREAM:
             style = "STREAM"
@@ -468,7 +468,7 @@ class Socket(object):
         if isinstance(address, tuple):
             address = address[0]
             port = address[1]
-        remote_dest = self.loopkup(address)
+        remote_dest = self.lookup(address)
         if remote_dest:
             dgram = bytearray()
             dgram += b"3.0 "
