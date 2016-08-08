@@ -473,7 +473,7 @@ class Socket(object):
             dgram = bytearray()
             dgram += b"3.0 "
             dgram += self.socketname.encode('ascii') + b" "
-            dgram += remote_dest.encode('ascii') + b"\n"
+            dgram += remote_dest.to_public().base64() + b"\n"
             dgram += data
             return self._dgram_sock.sendto(dgram, self._samDgramAddr)
         else:
