@@ -19,8 +19,7 @@ import socket as pysocket
 from contextlib import wraps
 
 # Address family for i2p
-# TODO: fix this
-AF_I2P = pysocket.AF_INET
+AF_I2P = 9001
 
 _defaultSAMAddr = ('127.0.0.1', 7656)
 
