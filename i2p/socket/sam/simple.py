@@ -22,6 +22,9 @@ from contextlib import wraps
 AF_I2P = 9001
 
 _defaultSAMAddr = ('127.0.0.1', 7656)
+_defaultMaxVersion = '3.0'
+
+_greeting = lambda : 'HELLO VERSION MIN=3.0 MAX={}'.format(_defaultMaxVersion)
 
 class State(Enum):
     """
@@ -223,7 +226,7 @@ class Socket(object):
         handshake with sam via a socket.socket instance
         """
         #TODO: sam versions
-        repl = _sam_cmd(sock, 'HELLO VERSION MIN=3.0 MAX=3.2')
+        repl = _sam_cmd(sock, _greeting())
         if repl.opts['RESULT'] == 'OK':
             self._state = State.Established
         else:
@@ -260,7 +263,7 @@ class Socket(object):
         self._data_sock.connect(self._samAddr)
         # handshake
         # TODO: versions
-        repl = _sam_cmd(self._data_sock, 'HELLO VERSION MIN=3.0 MAX=3.2')
+        repl = _sam_cmd(self._data_sock, _greeting())
         if repl.opts["RESULT"] == "OK":
             # handshake good
             cmd = 'STREAM CONNECT ID={} DESTINATION={} SILENT=false'.format(nickname, dest.base64())
@@ -313,7 +316,7 @@ class Socket(object):
         # connect to sam
         sock.connect(self._samAddr)
         # say hello
-        repl = _sam_cmd(sock, 'HELLO VERSION MIN=3.0 MAX=3.2')
+        repl = _sam_cmd(sock, _greeting())
         if repl.opts["RESULT"] != "OK":
             raise pysocket.error(errno.ENOTCONN, "failed to accept: %s" % repl.opts['RESULT'])
         # send command
@@ -409,7 +412,7 @@ class Socket(object):
         # override socket functions
         sock = _WrappedPySocket(sock, self.dest, dest)
         # return socket
-        return sock, dest
+        return sock, (dest, 0)
 
     @samState(State.Running)
     @samType(SAM.SOCK_STREAM)
@@ -655,7 +658,7 @@ def checkAPIConnection(samaddr=_defaultSAMAddr):
     sock = pysocket.socket()
     try:
         sock.connect(samaddr)
-        repl = _sam_cmd(sock, 'HELLO VERSION MIN=3.0 MAX=3.2')
+        repl = _sam_cmd(sock, _greeting())
         if repl.opts['RESULT'] != 'OK':
             # fail to handshake
             sock.close()
@@ -680,7 +683,7 @@ def lookup(name, samAddr=_defaultSAMAddr):
     sock = pysocket.socket()
     try:
         sock.connect(samAddr)
-        repl = _sam_cmd(sock, 'HELLO VERSION MIN=3.0 MAX=3.2')
+        repl = _sam_cmd(sock, _greeting())
         if repl.opts['RESULT'] != 'OK':
             # fail to handshake
             sock.close()
