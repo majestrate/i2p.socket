@@ -182,11 +182,11 @@ class Socket(object):
             if self._samSocket is None:
                 self._log.info("connecting to sam")
                 # we are not connected
-                samSocket = pysocket.socket()
-                samSocket.setsockopt(pysocket.IPPROTO_TCP, pysocket.SO_KEEPALIVE, 1)
+                samSocket = None
                 try:
                     # connect
-                    samSocket.connect(self._samAddr)
+                    samSocket = pysocket.create_connection(self._samAddr)
+                    samSocket.setsockopt(pysocket.IPPROTO_TCP, pysocket.SO_KEEPALIVE, 1)
                     # do handshake
                     self._samHandshake(samSocket)
                 except pysocket.timeout as ex:
@@ -259,8 +259,7 @@ class Socket(object):
             addr = addr[0]
         dest = self.lookup(addr)
         # connect out
-        self._data_sock = pysocket.socket()
-        self._data_sock.connect(self._samAddr)
+        self._data_sock = pysocket.create_connection(self._samAddr)
         # handshake
         # TODO: versions
         repl = _sam_cmd(self._data_sock, _greeting())
@@ -311,10 +310,8 @@ class Socket(object):
                 sock = monkey.get_original('socket', 'socket')()
         except:
             pass
-        if not sock:
-            sock = pysocket.socket()
         # connect to sam
-        sock.connect(self._samAddr)
+        sock = pysocket.create_connection(self._samAddr)
         # say hello
         repl = _sam_cmd(sock, _greeting())
         if repl.opts["RESULT"] != "OK":
@@ -570,9 +567,9 @@ class Socket(object):
             return self._dest_cache[name]
         # cache miss, do lookup
         # create new socket for lookup
-        sock = pysocket.socket()
+        sock = None
         try:
-            sock.connect(self._samAddr)
+            sock = pysocket.create_connection(self._samAddr)
             self._samHandshake(sock)
         except pysocket.timeout as ex:
             raise ex
@@ -655,9 +652,8 @@ class Socket(object):
             return None
 
 def checkAPIConnection(samaddr=_defaultSAMAddr):
-    sock = pysocket.socket()
     try:
-        sock.connect(samaddr)
+        sock = pysocket.create_connection(samaddr)
         repl = _sam_cmd(sock, _greeting())
         if repl.opts['RESULT'] != 'OK':
             # fail to handshake
@@ -675,14 +671,13 @@ def lookup(name, samAddr=_defaultSAMAddr):
     lookup an i2p name
     :returns i2p.datatypes.Destination:
     """
-    sock = pysocket.socket()
     if isinstance(name, datatypes.Destination):
         # if it's already a destination return it :p
         return name
     # create new socket for lookup
-    sock = pysocket.socket()
+    sock = None
     try:
-        sock.connect(samAddr)
+        sock = pysocket.create_connection(samAddr)
         repl = _sam_cmd(sock, _greeting())
         if repl.opts['RESULT'] != 'OK':
             # fail to handshake
@@ -693,6 +688,7 @@ def lookup(name, samAddr=_defaultSAMAddr):
     except pysocket.error as ex:
         raise ex
     else:
+        assert sock is not None
         # do lookup
         repl = _sam_cmd(sock, "NAMING LOOKUP NAME={}".format(name))
         # close socket as it is not needed anymore
