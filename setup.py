@@ -28,7 +28,7 @@ setup(
     description='I2P socket module',
     long_description=long_description,
     author='Jeff',
-    author_email='ampernand@gmail.com',
+    author_email='jeff@i2p.rocks',
     url='https://github.com/majestrate/i2p.socket',
     download_url='https://github.com/majestrate/i2p.socket/tarball/{}'.format(version),
     classifiers=[
@@ -47,7 +47,7 @@ setup(
     license='MIT',
     version=version,
     install_requires=install_requires,
-    extra_require={'crypto': crypto_requires},
+    extras_require={'crypto': crypto_requires},
     packages=['i2p', 'i2p.crypto', 'i2p.socket', 'i2p.socket.sam'],
     keywords=['i2p', 'socket'],
 )
