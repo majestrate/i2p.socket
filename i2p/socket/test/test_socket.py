@@ -10,6 +10,8 @@ class TestSocket(TestCase):
         """
         sock = socket.socket()
         sock.connect(("psi.i2p", 80))
+        sock.sendall(b'GET / HTTP/1.0\r\n\r\n')
+        sock.recv(1024)
         sock.close()
 
         

@@ -180,7 +180,7 @@ class Socket(object):
     def samConnect(func):
         def check_connect(self, *args, **kwargs):
             if self._samSocket is None:
-                self._log.info("connecting to sam")
+                self._log.info("connecting to i2p")
                 # we are not connected
                 samSocket = None
                 try:
@@ -381,6 +381,7 @@ class Socket(object):
                     elif hasattr(keyfile, "write"):
                         keyfile.write(data)
             self.socketname = nickname
+            self.dest = lookup("ME", sock=self._samSocket)
             # TODO: do we really want to do this?
             self._apply_defered_socket_props(self._samSocket)
             self._state = State.Ready
@@ -666,7 +667,7 @@ def checkAPIConnection(samaddr=_defaultSAMAddr):
     else:
         return True
 
-def lookup(name, samAddr=_defaultSAMAddr):
+def lookup(name, samAddr=_defaultSAMAddr, sock=None):
     """
     lookup an i2p name
     :returns i2p.datatypes.Destination:
@@ -674,28 +675,30 @@ def lookup(name, samAddr=_defaultSAMAddr):
     if isinstance(name, datatypes.Destination):
         # if it's already a destination return it :p
         return name
+    doclose = sock is None
     # create new socket for lookup
-    sock = None
-    try:
-        sock = pysocket.create_connection(samAddr)
-        repl = _sam_cmd(sock, _greeting())
-        if repl.opts['RESULT'] != 'OK':
-            # fail to handshake
-            sock.close()
-            raise pysocket.error(errno.EAGAIN, "cannot connect to i2p router")
-    except pysocket.timeout as ex:
-        raise ex
-    except pysocket.error as ex:
-        raise ex
-    else:
-        assert sock is not None
-        # do lookup
-        repl = _sam_cmd(sock, "NAMING LOOKUP NAME={}".format(name))
-        # close socket as it is not needed anymore
+    if sock is None:
+        try:
+            sock = pysocket.create_connection(samAddr)
+            repl = _sam_cmd(sock, _greeting())
+            if repl.opts['RESULT'] != 'OK':
+                # fail to handshake
+                sock.close()
+                raise pysocket.error(errno.EAGAIN, "cannot connect to i2p router")
+        except pysocket.timeout as ex:
+            raise ex
+        except pysocket.error as ex:
+            raise ex
+    
+    assert sock is not None
+    # do lookup
+    repl = _sam_cmd(sock, "NAMING LOOKUP NAME={}".format(name))
+    # close socket as it is not needed anymore
+    if doclose:
         sock.close()
-        if 'VALUE' in repl.opts:
-            dest = datatypes.Destination(raw=repl.opts['VALUE'], b64=True)
-            return dest
-        else:
-            # failed to lookup
-            raise pysocket.herror(errno.EAGAIN, "name not resolved: {}".format(name))
+    if 'VALUE' in repl.opts:
+        dest = datatypes.Destination(raw=repl.opts['VALUE'], b64=True)
+        return dest
+    else:
+        # failed to lookup
+        raise pysocket.herror(errno.EAGAIN, "name not resolved: {}".format(name))

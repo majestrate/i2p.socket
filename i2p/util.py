@@ -4,12 +4,16 @@ import base64
 import struct
 import zlib
 import time
+import hashlib
 
 BUFFER_SIZE = 1024
 NO_SESSION_ID = 65535
 PROTOCOL_VERSION = b'\x2a'
 _desthash_valid = '1234567890qwertyuiopasdfghjklzxcvbnm'
 
+_newsha256 = lambda x : x(hashlib.new("sha256"))
+sha256 = lambda x : _newsha256(lambda h : h.update(x) or h.digest())
+    
 def get_as_int(data):
     if isinstance(data, int):
         return data

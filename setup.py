@@ -10,17 +10,18 @@ if os.path.exists(long_description_fname):
         long_description = infile.read()
 
 
+crypto_requires = []
+crypto_requires_fname = 'crypto_requirements.txt'
 install_requires = []
-install_requires_fname = 'requirements.txt'
 
-if os.path.exists(install_requires_fname):
-    with open(install_requires_fname, 'r') as infile:
-        install_requires = infile.read().split()
+if os.path.exists(crypto_requires_fname):
+    with open(crypto_requires_fname, 'r') as infile:
+        crypto_requires = infile.read().split()
 
 if sys.version_info[0] < 3:
     install_requires.append("future>=0.14.0")
-
-version = '0.3.2'
+    install_requires.append("enum34>=1.0")
+version = '0.4.0'
 
 setup(
     name='i2p.socket',
@@ -46,6 +47,7 @@ setup(
     license='MIT',
     version=version,
     install_requires=install_requires,
-    packages=['i2p', 'i2p.socket', 'i2p.socket.sam'],
+    extra_require={'crypto': crypto_requires},
+    packages=['i2p', 'i2p.crypto', 'i2p.socket', 'i2p.socket.sam'],
     keywords=['i2p', 'socket'],
 )

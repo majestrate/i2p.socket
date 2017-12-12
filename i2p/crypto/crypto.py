@@ -6,6 +6,7 @@ from Crypto.PublicKey import ElGamal, DSA
 from Crypto.Random.random import StrongRandom as random
 from Crypto.Util import asn1
 from pyelliptic.ecc import ECC
+
 from enum import Enum
 try:
     import libnacl
@@ -17,7 +18,7 @@ except Exception as ex:
 def _assert_libnacl():
     assert libnacl is not None
     
-from .util import *
+from i2p.util import *
 
 #
 # Parameters
@@ -402,7 +403,6 @@ class EncAlgo(Enum):
     ELGAMAL = "ElGamal"
     EC = "EC"
 
-
 class SigAlgo(Enum):
     DSA = "DSA"
     EC = "EC"
@@ -415,7 +415,7 @@ class EncType(Enum):
     EC_P256 = (1, 64, 32, EncAlgo.EC, "EC/None/NoPadding", P256_SPEC, "0.9.20", None)
     EC_P384 = (2, 96, 48, EncAlgo.EC, "EC/None/NoPadding", P384_SPEC, "0.9.20", None)
     EC_P521 = (3, 132, 66, EncAlgo.EC, "EC/None/NoPadding", P521_SPEC, "0.9.20", None)
-
+    
     @property
     def code(self):
         return self.value[0]
