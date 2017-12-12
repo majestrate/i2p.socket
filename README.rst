@@ -4,7 +4,7 @@ i2p.socket
 
 Requirements:
 
-* Python 2.7 or 3.x
+* Python 2.7 or >= 3.4 
 
 * Java I2P 0.9.14 and higher or i2pd 2.17.0 and higher
 
