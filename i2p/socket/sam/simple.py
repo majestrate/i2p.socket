@@ -327,7 +327,7 @@ class Socket(object):
     @samConnect
     @samState(State.Established)
     @samType(SAM.SOCK_STREAM, SAM.SOCK_DGRAM)
-    def bind(self, keyfile, nickname=None, **i2cpOptions):
+    def bind(self, keyfile=None, nickname=None, **i2cpOptions):
         """
         bind to an address
         :param keyfile: the file containing the private keys to use or None to not store
