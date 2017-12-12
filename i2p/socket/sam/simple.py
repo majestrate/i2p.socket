@@ -1,4 +1,4 @@
-#
+
 # public domain
 #
 __doc__ = """
@@ -491,7 +491,7 @@ class Socket(object):
         if addr == self._samDgramAddr:
             # only accept packets from the sam udp address
             idx = data.index(b'\n')
-            return datatypes.Destination(raw=data[:idx], b64=True), bytearray(data[1+idx:])
+            return bytearray(data[1+idx:]), datatypes.Destination(raw=data[:idx], b64=True)
         else:
             self._log.warn("invalid source address for sam packet {}".format(addr))
 
